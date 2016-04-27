@@ -86,6 +86,10 @@ class FedexRateServiceRequest(FedexBaseService):
         self.RequestedShipment.PackageCount = 0
         self.RequestedShipment.RequestedPackageLineItems = []
 
+        # This allows for including Saturday Delivery options in a
+        # single request.
+        self.VariableOptions = []
+
         # This is good to review if you'd like to see what the data structure
         # looks like.
         self.logger.debug(self.RequestedShipment)
@@ -105,7 +109,8 @@ class FedexRateServiceRequest(FedexBaseService):
                 TransactionDetail=self.TransactionDetail,
                 Version=self.VersionId,
                 RequestedShipment=self.RequestedShipment,
-                ReturnTransitAndCommit=self.ReturnTransitAndCommit)
+                ReturnTransitAndCommit=self.ReturnTransitAndCommit,
+                VariableOptions=self.VariableOptions)
 
     def add_package(self, package_item):
         """

@@ -2,6 +2,7 @@
 Test module for the Fedex RateService WSDL.
 """
 
+import datetime
 import unittest
 import logging
 import sys
@@ -24,7 +25,7 @@ class RateServiceTests(unittest.TestCase):
     These tests verify that the rate service WSDL is in good shape.
     """
 
-    def test_rate(self):
+    def base_rate(self):
         rate = FedexRateServiceRequest(CONFIG_OBJ)
 
         rate.RequestedShipment.DropoffType = 'REGULAR_PICKUP'
@@ -51,9 +52,35 @@ class RateServiceTests(unittest.TestCase):
         package1.GroupPackageCount = 1
         rate.add_package(package1)
 
+        return rate
+
+    def test_rate(self):
+        rate = self.base_rate()
+
         rate.send_request()
 
         assert rate.response.HighestSeverity == 'SUCCESS', rate.response.Notifications[0].Message
+
+    def test_rate_saturday_delivery(self):
+        rate = self.base_rate()
+
+        # Any service type
+        rate.RequestedShipment.ServiceType = None
+
+        # Find next friday
+        ship_date = datetime.datetime.now()
+        while ship_date.weekday() != 4:
+            ship_date += datetime.timedelta(days=1)
+        rate.RequestedShipment.ShipTimestamp = ship_date
+
+        # Add saturday delivery option
+        variable_options = rate.create_wsdl_object_of_type('ServiceOptionType')
+        rate.VariableOptions = [variable_options.SATURDAY_DELIVERY]
+
+        rate.send_request()
+
+        assert rate.response.HighestSeverity == 'SUCCESS'
+        assert any(['SATURDAY_DELIVERY' in getattr(service, 'AppliedOptions', []) for service in rate.response.RateReplyDetails])
 
 
 if __name__ == "__main__":
