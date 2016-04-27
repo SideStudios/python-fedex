@@ -4,13 +4,14 @@ test suite.
 """
 from fedex.config import FedexConfig
 
-def get_test_config():
+
+def get_fedex_config():
     """
     Returns a basic FedexConfig to test with.
     """
     # Test server (Enter your credentials here)
-    return FedexConfig(key='xxxxxxxxxxxxxxxxx',
-                       password='xxxxxxxxxxxxxxxxxxxxxxxxx',
-                       account_number='xxxxxxxxx',
-                       meter_number='xxxxxxxxxx',
+    return FedexConfig(key='',
+                       password='',
+                       account_number='',
+                       meter_number='',
                        use_test_server=True)

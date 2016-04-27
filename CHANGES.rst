@@ -1,6 +1,60 @@
 Change Log
 ==========
 
+2.3.1
+-----
+
+* Set fedex logging to INFO for tests. (radzhome)
+* Sphinx documentation (hosted on read the docs). (radzhome)
+* Update Ship Service test to allow warnings. (radzhome)
+* Added log warning for requests that yield a WARNING. (radzhome)
+
+2.3.0
+-----
+
+* Added Location Service using v3 WSDL. (radzhome)
+* Added examples and unit tests for Location Service. (radzhome)
+* Updated certification process scripts to work with latest WSDLs. (radzhome)
+* Added warning logging for requests that come back with warning notes. (radzhome)
+* Added PyPI, Travis, requires.io integration/badges. (radzhome)
+* Organization change from gtaylor to python-fedex-devs. (gtaylor)
+* Added deprecation message for movement service. (radzhome)
+* Added conversion tools to convert suds xml object into python dict. (radzhome)
+* Redirect logging to stdout for examples and tests when not ran via nose. (radzhome)
+
+2.2.0
+-----
+
+* Added Country Service / Postal Code Validation service. (radzhome)
+* Added CountryService_v4.wsdl for Postal Code Validation. (radzhome)
+* Added unit tests and examples for Country service. (radzhome)
+* Added Signature Option to ship example. (radzhome)
+* Fix base service logging request and response. (radzhome)
+
+2.1.0
+-----
+
+* Added Validation, Availability and Commitment (AVC) service. (radzhome)
+* Added [Validation]AvailabilityAndCommitmentService_v4.wsdl for AVC service. (radzhome)
+* Added examples and unit tests for AVC service.
+* Refactored examples and documentation. (radzhome)
+* A quick PEP8 pass using pycharm on most of the codebase (radzhome)
+* Add travis yml (radzhome)
+
+
+2.0.0
+-----
+
+* Bump ShipService WSDL to v17 for create and delete shipment. (radzhome)
+* Bump AddressValidation WSDL to v4. (radzhome)
+* Bump RateService WSDL to v18. (radzhome)
+* Bump TrackService WSDL to v10. (radzhome)
+* General improvements to base class. (radzhome)
+* Refactoring and updates to examples. (radzhome)
+* Added test classes. (radzhome)
+* Remove old and unused WSDLs. (radzhome)
+* Change dependency to suds-jurko to include python 3 support. (radzhome)
+
 1.1.1
 -----
 
@@ -11,7 +65,7 @@ Change Log
 -----
 
 * A quick PEP8 pass on most of the codebase. Yucky. (gtaylor)
-* Changing recommended install method to use pip + PyPi. (radlws)
+* Changing recommended install method to use pip + PyPi. (radzhome)
 * Updated rate_request and freight_rate_request examples for WSDL v16
   compatibility. (foxxyz)
 * Updated rate service WSDL from v8 to v16. (foxxyz)

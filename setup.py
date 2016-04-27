@@ -14,15 +14,16 @@ CLASSIFIERS = [
     'Topic :: Software Development :: Libraries :: Python Modules'
 ]
 
-KEYWORDS = 'fedex soap suds wrapper'
+KEYWORDS = 'fedex soap suds wrapper rate location ship service'
 
 setup(name='fedex',
       version=fedex.VERSION,
       description='Fedex Web Services API wrapper.',
       long_description=LONG_DESCRIPTION,
-      author='Gregory Taylor',
+      author='Greg Taylor',
       author_email='gtaylor@gc-taylor.com',
-      url='https://github.com/gtaylor/python-fedex',
+      maintainer='Python Fedex Developers',
+      url='https://github.com/python-fedex-devs/python-fedex',
       download_url='http://pypi.python.org/pypi/fedex/',
       packages=['fedex', 'fedex.services', 'fedex.printers'],
       package_dir={'fedex': 'fedex'},
@@ -32,5 +33,5 @@ setup(name='fedex',
       classifiers=CLASSIFIERS,
       keywords=KEYWORDS,
       requires=['suds'],
-      install_requires=['suds-jurko>=0.6'],
-)
+      install_requires=['suds-jurko'],
+      )

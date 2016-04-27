@@ -1,13 +1,13 @@
 """
 Rate Service Module
-===================
+
 This package contains classes to request pre-ship rating information and to
 determine estimated or courtesy billing quotes. Time in Transit can be
 returned with the rates if it is specified in the request.
 """
 
-from datetime import datetime
-from .. base_service import FedexBaseService
+import datetime
+from ..base_service import FedexBaseService
 
 
 class FedexRateServiceRequest(FedexBaseService):
@@ -27,19 +27,19 @@ class FedexRateServiceRequest(FedexBaseService):
         """
 
         self._config_obj = config_obj
-        
+
         # Holds version info for the VersionId SOAP object.
-        self._version_info = {'service_id': 'crs', 'major': '16', 
-                             'intermediate': '0', 'minor': '0'}
-        
+        self._version_info = {'service_id': 'crs', 'major': '18',
+                              'intermediate': '0', 'minor': '0'}
+
         self.RequestedShipment = None
-        """@ivar: Holds the RequestedShipment WSDL object."""
+        """@ivar: Holds the RequestedShipment WSDL object including the shipper, recipient and shipt time."""
         # Call the parent FedexBaseService class for basic setup work.
-        super(FedexRateServiceRequest, self).__init__(self._config_obj, 
-                                                         'RateService_v16.wsdl',
-                                                         *args, **kwargs)
+        super(FedexRateServiceRequest, self).__init__(
+                self._config_obj, 'RateService_v18.wsdl', *args, **kwargs)
         self.ClientDetail.Region = config_obj.express_region_code
-        
+        """@ivar: Holds the express region code from the config object."""
+
     def _prepare_wsdl_objects(self):
         """
         This is the data that will be used to create your shipment. Create
@@ -51,43 +51,41 @@ class FedexRateServiceRequest(FedexBaseService):
 
         # This is the primary data structure for processShipment requests.
         self.RequestedShipment = self.client.factory.create('RequestedShipment')
-        self.RequestedShipment.ShipTimestamp = datetime.now()
-        
-        TotalWeight = self.client.factory.create('Weight')
+        self.RequestedShipment.ShipTimestamp = datetime.datetime.now()
+
+        # Defaults for TotalWeight wsdl object.
+        total_weight = self.client.factory.create('Weight')
         # Start at nothing.
-        TotalWeight.Value = 0.0
+        total_weight.Value = 0.0
         # Default to pounds.
-        TotalWeight.Units = 'LB'
+        total_weight.Units = 'LB'
         # This is the total weight of the entire shipment. Shipments may
         # contain more than one package.
-        self.RequestedShipment.TotalWeight = TotalWeight
-            
+        self.RequestedShipment.TotalWeight = total_weight
+
         # This is the top level data structure for Shipper information.
-        ShipperParty = self.client.factory.create('Party')
-        ShipperParty.Address = self.client.factory.create('Address')
-        ShipperParty.Contact = self.client.factory.create('Contact')
-        
+        shipper = self.client.factory.create('Party')
+        shipper.Address = self.client.factory.create('Address')
+        shipper.Contact = self.client.factory.create('Contact')
+
         # Link the ShipperParty to our master data structure.
-        self.RequestedShipment.Shipper = ShipperParty
+        self.RequestedShipment.Shipper = shipper
 
         # This is the top level data structure for Recipient information.
-        RecipientParty = self.client.factory.create('Party')
-        RecipientParty.Contact = self.client.factory.create('Contact')
-        RecipientParty.Address = self.client.factory.create('Address')
-        
+        recipient_party = self.client.factory.create('Party')
+        recipient_party.Contact = self.client.factory.create('Contact')
+        recipient_party.Address = self.client.factory.create('Address')
         # Link the RecipientParty object to our master data structure.
-        self.RequestedShipment.Recipient = RecipientParty
-                
-        Payor = self.client.factory.create('Payor')
-        # Grab the account number from the FedexConfig object by default.
-        Payor.AccountNumber = self._config_obj.account_number
-        # Assume US.
-        Payor.CountryCode = 'US'
-        
+        self.RequestedShipment.Recipient = recipient_party
+
+        # Make sender responsible for payment by default.
+        self.RequestedShipment.ShippingChargesPayment = self.create_wsdl_object_of_type('Payment')
+        self.RequestedShipment.ShippingChargesPayment.PaymentType = 'SENDER'
+
         # Start with no packages, user must add them.
         self.RequestedShipment.PackageCount = 0
         self.RequestedShipment.RequestedPackageLineItems = []
-                
+
         # This is good to review if you'd like to see what the data structure
         # looks like.
         self.logger.debug(self.RequestedShipment)
@@ -102,13 +100,13 @@ class FedexRateServiceRequest(FedexBaseService):
 
         # Fire off the query.
         return self.client.service.getRates(
-            WebAuthenticationDetail=self.WebAuthenticationDetail,
-            ClientDetail=self.ClientDetail,
-            TransactionDetail=self.TransactionDetail,
-            Version=self.VersionId,
-            RequestedShipment=self.RequestedShipment,
-            ReturnTransitAndCommit=self.ReturnTransitAndCommit)
-    
+                WebAuthenticationDetail=self.WebAuthenticationDetail,
+                ClientDetail=self.ClientDetail,
+                TransactionDetail=self.TransactionDetail,
+                Version=self.VersionId,
+                RequestedShipment=self.RequestedShipment,
+                ReturnTransitAndCommit=self.ReturnTransitAndCommit)
+
     def add_package(self, package_item):
         """
         Adds a package to the ship request.

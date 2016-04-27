@@ -12,6 +12,32 @@ import logging
 
 import suds
 from suds.client import Client
+from suds.plugin import MessagePlugin
+
+
+class GeneralSudsPlugin(MessagePlugin):
+    """
+    General Suds Plugin: Adds logging request and response functionality
+    and prunes empty WSDL objects before sending.
+    """
+
+    def __init__(self, **kwargs):
+        """Initializes the request and response loggers."""
+        self.request_logger = logging.getLogger('fedex.request')
+        self.response_logger = logging.getLogger('fedex.response')
+        self.kwargs = kwargs
+
+    def marshalled(self, context):
+        """Removes the WSDL objects that do not have a value before sending."""
+        context.envelope = context.envelope.prune()
+
+    def sending(self, context):
+        """Logs the sent request."""
+        self.request_logger.info("FedEx Request {}".format(context.envelope))
+
+    def received(self, context):
+        """Logs the received response."""
+        self.response_logger.info("FedEx Response {}".format(context.reply))
 
 
 class FedexBaseServiceException(Exception):
@@ -55,9 +81,10 @@ class SchemaValidationError(FedexBaseServiceException):
 
     def __init__(self, fault):
         self.error_code = -1
-        self.value = "suds encountered an error validating your data against this service's WSDL schema. Please double-check for missing or invalid values, filling all required fields."
+        self.value = "suds encountered an error validating your data against this service's WSDL schema. " \
+                     "Please double-check for missing or invalid values, filling all required fields."
         try:
-            self.value += ' Details: {}'.format(fault.detail.desc)
+            self.value += ' Details: {}'.format(fault)
         except AttributeError:
             pass
 
@@ -87,8 +114,13 @@ class FedexBaseService(object):
 
         self.logger = logging.getLogger('fedex')
         """@ivar: Python logger instance with name 'fedex'."""
+
         self.config_obj = config_obj
         """@ivar: The FedexConfig object to pull auth info from."""
+
+        if not self._version_info:
+            self._version_info = {}
+        """#ivar: Set in each service class. Holds version info for the VersionId SOAP object."""
 
         # If the config object is set to use the test server, point
         # suds at the test server WSDL directory.
@@ -100,7 +132,8 @@ class FedexBaseService(object):
             self.logger.info("Using production server.")
             self.wsdl_path = os.path.join(config_obj.wsdl_path, wsdl_name)
 
-        self.client = Client('file:///%s' % self.wsdl_path.lstrip('/'))
+        self.client = Client('file:///%s' % self.wsdl_path.lstrip('/'), plugins=[GeneralSudsPlugin()])
+        # self.client.options.cache.clear()  # Clear the cache, then re-init client when changing wsdl file.
 
         self.VersionId = None
         """@ivar: Holds details on the version numbers of the WSDL."""
@@ -117,7 +150,7 @@ class FedexBaseService(object):
         """@ivar: Holds customer-specified transaction IDs."""
 
         self.__set_web_authentication_detail()
-        self.__set_client_detail()
+        self.__set_client_detail(*args, **kwargs)
         self.__set_version_id()
         self.__set_transaction_detail(*args, **kwargs)
         self._prepare_wsdl_objects()
@@ -129,55 +162,75 @@ class FedexBaseService(object):
         """
 
         # Start of the authentication stuff.
-        WebAuthenticationCredential = self.client.factory.create('WebAuthenticationCredential')
-        WebAuthenticationCredential.Key = self.config_obj.key
-        WebAuthenticationCredential.Password = self.config_obj.password
+        web_authentication_credential = self.client.factory.create('WebAuthenticationCredential')
+        web_authentication_credential.Key = self.config_obj.key
+        web_authentication_credential.Password = self.config_obj.password
 
         # Encapsulates the auth credentials.
-        WebAuthenticationDetail = self.client.factory.create('WebAuthenticationDetail')
-        WebAuthenticationDetail.UserCredential = WebAuthenticationCredential
-        self.WebAuthenticationDetail = WebAuthenticationDetail
+        web_authentication_detail = self.client.factory.create('WebAuthenticationDetail')
+        web_authentication_detail.UserCredential = web_authentication_credential
 
-    def __set_client_detail(self):
+        # Set Default ParentCredential
+        if hasattr(web_authentication_detail, 'ParentCredential'):
+            web_authentication_detail.ParentCredential = web_authentication_credential
+
+        self.WebAuthenticationDetail = web_authentication_detail
+
+    def __set_client_detail(self, *args, **kwargs):
         """
         Sets up the ClientDetail node, which is required for all shipping
         related requests.
         """
 
-        ClientDetail = self.client.factory.create('ClientDetail')
-        ClientDetail.AccountNumber = self.config_obj.account_number
-        ClientDetail.MeterNumber = self.config_obj.meter_number
-        ClientDetail.IntegratorId = self.config_obj.integrator_id
-        if hasattr(ClientDetail, 'Region'):
-            ClientDetail.Region = self.config_obj.express_region_code
-        self.ClientDetail = ClientDetail
+        client_detail = self.client.factory.create('ClientDetail')
+        client_detail.AccountNumber = self.config_obj.account_number
+        client_detail.MeterNumber = self.config_obj.meter_number
+        client_detail.IntegratorId = self.config_obj.integrator_id
+        if hasattr(client_detail, 'Region'):
+            client_detail.Region = self.config_obj.express_region_code
+
+        client_language_code = kwargs.get('client_language_code', None)
+        client_locale_code = kwargs.get('client_locale_code', None)
+
+        if hasattr(client_detail, 'Localization') and (client_language_code or client_locale_code):
+            localization = self.client.factory.create('Localization')
+
+            if client_language_code:
+                localization.LanguageCode = client_language_code
+
+            if client_locale_code:
+                localization.LocaleCode = client_locale_code
+
+            client_detail.Localization = localization
+
+        self.ClientDetail = client_detail
 
     def __set_transaction_detail(self, *args, **kwargs):
         """
         Checks kwargs for 'customer_transaction_id' and sets it if present.
         """
 
-        customer_transaction_id = kwargs.get('customer_transaction_id', False)
+        customer_transaction_id = kwargs.get('customer_transaction_id', None)
         if customer_transaction_id:
-            TransactionDetail = self.client.factory.create('TransactionDetail')
-            TransactionDetail.CustomerTransactionId = customer_transaction_id
-            self.logger.debug(TransactionDetail)
-            self.TransactionDetail = TransactionDetail
+            transaction_detail = self.client.factory.create('TransactionDetail')
+            transaction_detail.CustomerTransactionId = customer_transaction_id
+            self.logger.debug(transaction_detail)
+            self.TransactionDetail = transaction_detail
 
     def __set_version_id(self):
         """
         Pulles the versioning info for the request from the child request.
         """
 
-        VersionId = self.client.factory.create('VersionId')
-        VersionId.ServiceId = self._version_info['service_id']
-        VersionId.Major = self._version_info['major']
-        VersionId.Intermediate = self._version_info['intermediate']
-        VersionId.Minor = self._version_info['minor']
-        self.logger.debug(VersionId)
-        self.VersionId = VersionId
+        version_id = self.client.factory.create('VersionId')
+        version_id.ServiceId = self._version_info['service_id']
+        version_id.Major = self._version_info['major']
+        version_id.Intermediate = self._version_info['intermediate']
+        version_id.Minor = self._version_info['minor']
+        self.logger.debug(version_id)
+        self.VersionId = version_id
 
-    def __prepare_wsdl_objects(self):
+    def _prepare_wsdl_objects(self):
         """
         This method should be over-ridden on each sub-class. It instantiates
         any of the required WSDL objects so the user can just print their
@@ -211,12 +264,37 @@ class FedexBaseService(object):
                     raise FedexError(notification.Code,
                                      notification.Message)
 
+    def _check_response_for_request_warnings(self):
+        """
+        Override this in a service module to check for errors that are
+        specific to that module. For example, changing state/province based
+        on postal code in a Rate Service request.
+        """
+
+        if self.response.HighestSeverity in ("NOTE", "WARNING"):
+            for notification in self.response.Notifications:
+                if notification.Severity in ("NOTE", "WARNING"):
+                    self.logger.warning(FedexFailure(notification.Code,
+                                                     notification.Message))
+
     def create_wsdl_object_of_type(self, type_name):
         """
         Creates and returns a WSDL object of the specified type.
+        :param type_name: specifies the object's type name from WSDL.
         """
 
         return self.client.factory.create(type_name)
+
+    def _assemble_and_send_request(self):
+        """
+        This method should be over-ridden on each sub-class.
+        It assembles all required objects
+        into the specific request object and calls send_request.
+        Objects that are not set will be pruned before sending
+        via GeneralSudsPlugin marshalled function.
+        """
+
+        pass
 
     def send_request(self, send_function=None):
         """
@@ -247,10 +325,15 @@ class FedexBaseService(object):
         # Check the response for general Fedex errors/failures that aren't
         # specific to any given WSDL/request.
         self.__check_response_for_fedex_error()
+
         # Check the response for errors specific to the particular request.
-        # This is handled by an overridden method on the child object.
+        # This method can be overridden by a method on the child class object.
         self._check_response_for_request_errors()
 
-        # Debug output.
+        # Check the response for errors specific to the particular request.
+        # This method can be overridden by a method on the child class object.
+        self._check_response_for_request_warnings()
+
+        # Debug output. (See Request and Response output)
         self.logger.debug("== FEDEX QUERY RESULT ==")
         self.logger.debug(self.response)

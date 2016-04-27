@@ -19,6 +19,7 @@ class FedexConfig(object):
     C{password} arguments and set the instance variables documented below
     at a later time if you must.
     """
+
     def __init__(self, key, password, account_number=None, meter_number=None, freight_account_number=None,
                  integrator_id=None, wsdl_path=None, express_region_code=None, use_test_server=False):
         """
@@ -61,13 +62,13 @@ class FedexConfig(object):
         self.integrator_id = integrator_id
         """@ivar: Web services integrator ID."""
         self.express_region_code = express_region_code
-        """@icar: Web services ExpressRegionCode"""
+        """@ivar: Web services ExpressRegionCode"""
         self.use_test_server = use_test_server
         """@ivar: When True, point to the test server."""
-        
+
         # Allow overriding of the WDSL path.
-        if wsdl_path == None:
-            self.wsdl_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+        if wsdl_path is None:
+            self.wsdl_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                           'wsdl')
-        else:
+        else:  # pragma: no cover
             self.wsdl_path = wsdl_path

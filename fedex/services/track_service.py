@@ -1,13 +1,12 @@
 """
 Tracking Service Module
-=======================
+
 This package contains the shipment tracking methods defined by Fedex's 
 TrackService WSDL file. Each is encapsulated in a class for easy access. 
 For more details on each, refer to the respective class's documentation.
 """
 
-
-from .. base_service import FedexBaseService, FedexError
+from ..base_service import FedexBaseService, FedexError
 
 
 class FedexInvalidTrackingNumber(FedexError):
@@ -35,55 +34,61 @@ class FedexTrackRequest(FedexBaseService):
         
         @type config_obj: L{FedexConfig}
         @param config_obj: A valid FedexConfig object.
-        
-        @type tracking_number_unique_id: str
-        @param tracking_number_unique_id: Used to distinguish duplicate FedEx tracking numbers.
         """
 
         self._config_obj = config_obj
-        
+
         # Holds version info for the VersionId SOAP object.
         self._version_info = {
             'service_id': 'trck',
-            'major': '5',
+            'major': '10',
             'intermediate': '0',
             'minor': '0'
         }
-        self.TrackPackageIdentifier = None
-        """@ivar: Holds the TrackPackageIdentifier WSDL object."""
-        
-        self.TrackingNumberUniqueIdentifier = kwargs.pop('tracking_number_unique_id', None)
-        
-        """@ivar: Holds the TrackingNumberUniqueIdentifier WSDL object."""
+        self.SelectionDetails = None
+        """@ivar: Holds the SelectionDetails WSDL object that includes tracking type and value."""
+
+        # Set Default as None. 'INCLUDE_DETAILED_SCANS' or None
+        self.ProcessingOptions = None
+        """@ivar: Holds the TrackRequestProcessingOptionType WSDL object that defaults no None."""
+
         # Call the parent FedexBaseService class for basic setup work.
         super(FedexTrackRequest, self).__init__(
-            self._config_obj, 'TrackService_v5.wsdl', *args, **kwargs)
+                self._config_obj, 'TrackService_v10.wsdl', *args, **kwargs)
         self.IncludeDetailedScans = False
-        
+
     def _prepare_wsdl_objects(self):
         """
         This sets the package identifier information. This may be a tracking
         number or a few different things as per the Fedex spec.
         """
 
-        self.TrackPackageIdentifier = self.client.factory.create('TrackPackageIdentifier')
+        self.SelectionDetails = self.client.factory.create('TrackSelectionDetail')
+
+        # Default to Fedex
+        self.SelectionDetails.CarrierCode = 'FDXE'
+
+        track_package_id = self.client.factory.create('TrackPackageIdentifier')
+
         # Default to tracking number.
-        self.TrackPackageIdentifier.Type = 'TRACKING_NUMBER_OR_DOORTAG'
-        
+        track_package_id.Type = 'TRACKING_NUMBER_OR_DOORTAG'
+
+        self.SelectionDetails.PackageIdentifier = track_package_id
+
     def _check_response_for_request_errors(self):
         """
         Checks the response to see if there were any errors specific to
         this WSDL.
         """
-        if self.response.HighestSeverity == "ERROR":
+        if self.response.HighestSeverity == "ERROR":  # pragma: no cover
             for notification in self.response.Notifications:
                 if notification.Severity == "ERROR":
                     if "Invalid tracking number" in notification.Message:
                         raise FedexInvalidTrackingNumber(
-                            notification.Code, notification.Message)
+                                notification.Code, notification.Message)
                     else:
                         raise FedexError(notification.Code, notification.Message)
-        
+
     def _assemble_and_send_request(self):
         """
         Fires off the Fedex request.
@@ -95,10 +100,9 @@ class FedexTrackRequest(FedexBaseService):
         client = self.client
         # Fire off the query.
         return client.service.track(
-            WebAuthenticationDetail=self.WebAuthenticationDetail,
-            ClientDetail=self.ClientDetail,
-            TransactionDetail=self.TransactionDetail,
-            Version=self.VersionId,
-            IncludeDetailedScans=self.IncludeDetailedScans,
-            PackageIdentifier=self.TrackPackageIdentifier,
-            TrackingNumberUniqueIdentifier = self.TrackingNumberUniqueIdentifier)
+                WebAuthenticationDetail=self.WebAuthenticationDetail,
+                ClientDetail=self.ClientDetail,
+                TransactionDetail=self.TransactionDetail,
+                Version=self.VersionId,
+                SelectionDetails=self.SelectionDetails,
+                ProcessingOptions=self.ProcessingOptions)
